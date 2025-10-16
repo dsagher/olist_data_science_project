@@ -17,7 +17,7 @@ df_customer,
 df_product_category) = load_processed_data()
 
 sales_by_region = views.get_sales_by_region(df_customer, df_order, df_geo, df_order_item, df_product)
-sales_over_time = views.get_sales_over_time(df_order)
+# sales_over_time = views.get_sales_over_time(df_order)
 
 
 st.title("Olist EDA Dashboard")
@@ -38,10 +38,6 @@ with st.container():
         with st.container(border=True):
             st.markdown(f"## **Total Products:** \n ### {views.get_total_products(df_product)}")
 
-# Sales over Time
-with st.container(border=True):
-    st.title("Sales over Time")
-    st.altair_chart(charts.sales_over_time_chart(sales_over_time))
 
 # Sales by Region and Top Categories
 with st.container():

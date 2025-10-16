@@ -40,7 +40,7 @@ def get_sales_by_region(df_customer: pd.DataFrame, df_orders: pd.DataFrame, df_g
     
     return sales_by_region
 
-def get_sales_over_time(df_order: pd.DataFrame) -> pd.DataFrame:
+def get_sales_over_time(df_order: pd.DataFrame, df_order_item: pd.DataFrame, df_product: pd.DataFrame) -> pd.DataFrame:
     import calendar
     df_order = df_order.copy()
 
@@ -49,9 +49,10 @@ def get_sales_over_time(df_order: pd.DataFrame) -> pd.DataFrame:
     df_order['order_purchase_month'] = pd.to_datetime(df_order['order_purchase_timestamp']).dt.month
     df_order['order_purchase_year'] = pd.to_datetime(df_order['order_purchase_timestamp']).dt.year
     df_order['order_purchase_day'] = pd.to_datetime(df_order['order_purchase_timestamp']).dt.day
-
+    order_item_product = df_order_item.merge(df_product, on='product_id', how='inner')
+    order_order_item_product = df_order.merge(order_item_product, on='order_id', how='inner')
     # Group by year and month and count the number of orders
-    sales_over_time = df_order.groupby(['order_purchase_year', 'order_purchase_month'])['order_id'].count().reset_index()
+    sales_over_time = order_order_item_product.groupby(['order_purchase_year', 'order_purchase_month', 'product_category_name'])['price'].sum().reset_index()
 
     # Convert month number to month name
     sales_over_time['order_purchase_month_word'] = sales_over_time['order_purchase_month'].apply(lambda x: calendar.month_name[x])
@@ -137,7 +138,7 @@ def get_revenue_ARPU_by_region(df_customer: pd.DataFrame, df_order: pd.DataFrame
     df_geo = df_geo.copy()
     df_order_item = df_order_item.copy()
     df_product = df_product.copy()
-    
+
     # Get unique zips with city, state, lat, lng, and region
     unique_zips = (df_geo[['geolocation_zip_code_prefix', 'geolocation_city', 'geolocation_state','geolocation_lat','geolocation_lng', 'geolocation_region']]
                     .groupby('geolocation_zip_code_prefix')
@@ -165,7 +166,7 @@ def get_revenue_ARPU_by_region(df_customer: pd.DataFrame, df_order: pd.DataFrame
 
     return sales_by_region
 
-def get_product_delivery_time_correlation(df_order_item: pd.DataFrame, df_product: pd.DataFrame, df_order: pd.DataFrame) -> pd.DataFrame:
+def get_product_delivery_time(df_order_item: pd.DataFrame, df_product: pd.DataFrame, df_order: pd.DataFrame) -> pd.DataFrame:
     df_order_item = df_order_item.copy()
     df_product = df_product.copy()
     df_order = df_order.copy()
@@ -173,6 +174,4 @@ def get_product_delivery_time_correlation(df_order_item: pd.DataFrame, df_produc
     for_analysis = df_order_item.merge(df_product[product_desc_cols], on='product_id', how='inner')
     for_analysis = for_analysis.merge(df_order, on='order_id', how='inner')
     for_analysis['product_volume'] = for_analysis['product_length_cm'] * for_analysis['product_height_cm'] * for_analysis['product_width_cm']
-    numeric_cols = ['product_weight_g', 'price','freight_value', 'delivery_time', 'product_volume']
-    for_analysis = for_analysis[numeric_cols].corr()
     return for_analysis

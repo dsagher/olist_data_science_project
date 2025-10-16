@@ -4,12 +4,43 @@ import numpy as np
 import datetime as dt
 from pathlib import Path
 import streamlit as st
+from sklearn.preprocessing import KBinsDiscretizer
 
 # Get the project root directory (parent of the app directory)
 PROJECT_ROOT = Path(__file__).parent.parent
 DATA_RAW_DIR = PROJECT_ROOT / 'data' / 'raw'
 DATA_PROCESSED_DIR = PROJECT_ROOT / 'data' / 'processed'
 
+
+state_to_region = {
+'SP': 'Southeast',
+'MG': 'Southeast',
+'RJ': 'Southeast',
+'ES': 'Southeast',
+'PR': 'South',
+'SC': 'South',
+'RS': 'South',
+'DF': 'Central-West',
+'GO': 'Central-West',
+'MS': 'Central-West',
+'MT': 'Central-West',
+'BA': 'Northeast',
+'SE': 'Northeast',
+'AL': 'Northeast',
+'PE': 'Northeast',
+'PB': 'Northeast',
+'RN': 'Northeast',
+'CE': 'Northeast',
+'PI': 'Northeast',
+'MA': 'Northeast',
+'PA': 'North',
+'AM': 'North',
+'AP': 'North',
+'RO': 'North',
+'AC': 'North',
+'RR': 'North',
+'TO': 'North'
+}
 
 @st.cache_data
 def load_raw_data():
@@ -54,6 +85,7 @@ def add_date_features(df_order: pd.DataFrame) -> pd.DataFrame:
     """
     Add the date features
     """
+
     df_order = df_order.copy()
     df_order['order_purchase_month'] = df_order['order_purchase_timestamp'].dt.to_period('M').dt.to_timestamp()
     df_order['order_purchase_year'] = df_order['order_purchase_timestamp'].dt.year
@@ -72,7 +104,7 @@ def impute_delivery_dates(df_order: pd.DataFrame) -> pd.DataFrame:
     customer_missing_mask = df_order['order_delivered_customer_date'].isna()
     carrier_missing_mask = df_order['order_delivered_carrier_date'].isna()
 
-    # Calculate delivery time without nulls
+    #! Move to add Date Features
     df_order['delivery_time'] = df_order['order_delivered_customer_date'] - df_order['order_purchase_timestamp']  
     df_order['delivery_time'] = df_order['delivery_time'].dt.days
 
@@ -82,53 +114,13 @@ def impute_delivery_dates(df_order: pd.DataFrame) -> pd.DataFrame:
     # Impute missing delivery times 
     delivery_mean = df_order['delivery_time'].mean()
     delivery_std = df_order['delivery_time'].std()
-    df_order.loc[mask, 'delivery_time'] = abs(lognorm.rvs(s=delivery_std, scale=np.exp(delivery_mean)))
+    df_order.loc[mask, 'delivery_time'] = lognorm.rvs(s=delivery_std, scale=np.exp(delivery_mean))
 
     # Impute customer and carrier date with purchase date plus average delivery time
     df_order.loc[customer_missing_mask, 'order_delivered_customer_date'] = df_order.loc[customer_missing_mask, 'order_purchase_timestamp']+ dt.timedelta(days=delivery_mean)
     df_order.loc[carrier_missing_mask, 'order_delivered_carrier_date'] = df_order.loc[carrier_missing_mask, 'order_purchase_timestamp']+ dt.timedelta(days=delivery_mean)
     
     return df_order
-
-def map_states_to_regions(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Map the states to regions
-    """
-    df = df.copy()
-    state_to_region = {
-    'SP': 'Southeast',
-    'MG': 'Southeast',
-    'RJ': 'Southeast',
-    'ES': 'Southeast',
-    'PR': 'South',
-    'SC': 'South',
-    'RS': 'South',
-    'DF': 'Central-West',
-    'GO': 'Central-West',
-    'MS': 'Central-West',
-    'MT': 'Central-West',
-    'BA': 'Northeast',
-    'SE': 'Northeast',
-    'AL': 'Northeast',
-    'PE': 'Northeast',
-    'PB': 'Northeast',
-    'RN': 'Northeast',
-    'CE': 'Northeast',
-    'PI': 'Northeast',
-    'MA': 'Northeast',
-    'PA': 'North',
-    'AM': 'North',
-    'AP': 'North',
-    'RO': 'North',
-    'AC': 'North',
-    'RR': 'North',
-    'TO': 'North'
-}
-    if 'customer_state' in df.columns:
-        df['customer_region'] = df['customer_state'].map(state_to_region)
-    if 'geolocation_state' in df.columns:
-        df['geolocation_region'] = df['geolocation_state'].map(state_to_region)
-    return df
 
 def merge_product_category(df_product: pd.DataFrame, df_product_category: pd.DataFrame) -> pd.DataFrame:
     """
@@ -153,9 +145,34 @@ def order_merge(df_order: pd.DataFrame, df_order_item: pd.DataFrame, df_order_pa
     return df_order
 
 def add_product_volume(df_order_item: pd.DataFrame) -> pd.DataFrame:
+
     """
     Add the product volume
     """
     df_order_item = df_order_item.copy()
     df_order_item['product_volume'] = df_order_item['product_length_cm'] * df_order_item['product_height_cm'] * df_order_item['product_width_cm']
     return df_order_item
+
+def add_customer_spending(df_customer: pd.DataFrame, df_order: pd.DataFrame, df_order_payment: pd.DataFrame) -> pd.DataFrame:
+
+    """
+    Add the customer spending
+    """
+    df_customer = df_customer.copy()
+    df_order = df_order.copy()
+    df_order_payment = df_order_payment.copy()
+
+    merged = pd.merge(df_customer, df_order, on='customer_id', how='inner')
+    merged = pd.merge(merged, df_order_payment, on='order_id', how='inner')
+    customer_spending = merged.groupby('customer_id')['payment_value'].sum().to_frame()
+
+    # Discretize spending
+    kbd = KBinsDiscretizer(n_bins=3, encode='ordinal', strategy='quantile')
+
+    # Fit and transform
+    kbd.fit(customer_spending)
+    customer_spending['customer_spending'] = kbd.transform(customer_spending)
+
+    # Merge with customer dataset
+    df_customer = pd.merge(df_customer, customer_spending, on='customer_id', how='inner')
+    return df_customer

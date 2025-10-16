@@ -55,13 +55,17 @@ def sales_vs_arpu_by_product_category_and_region(sales_by_region: pd.DataFrame) 
     size=alt.Size('Orders:Q', title='Order Count', scale=alt.Scale(range=[30, 1000])),
     color=alt.Color('geolocation_region:N', title='Region'),
     tooltip=['Product Category', 'geolocation_region', 'Sales', 'ARPU', 'Orders']
-).properties(
-    title='Sales vs ARPU by Product Category and Region',
-    width=800,
-    height=500
-).interactive()
+    ).properties(
+        title='Sales vs ARPU by Product Category and Region',
+        width=800,
+        height=500
+    ).interactive()
+    rule = alt.Chart(sales_by_region).mark_rule(color='red', strokeWidth=5).encode(
+        y=alt.Y('mean(ARPU):Q', title='Average Revenue per Order (ARPU)'),
+        color=alt.Color('geolocation_region:N', title='Region')
+    )
 
-    return bubble_chart
+    return bubble_chart + rule
 
 def sales_over_time_chart(sales_over_time: pd.DataFrame) -> alt.Chart:
     """
@@ -69,8 +73,9 @@ def sales_over_time_chart(sales_over_time: pd.DataFrame) -> alt.Chart:
     """
 
 
-    seventeen_eighteen_chart = alt.Chart(sales_over_time
-    ).mark_area(opacity=0.6).encode(
+    chart = alt.Chart(sales_over_time
+    ).mark_line(opacity=0.6).encode(
+        color=alt.Color('product_category_name:N', title='Product Category'),
         x=alt.X(
             "order_purchase_month_word:O",
             title="Month",
@@ -79,19 +84,14 @@ def sales_over_time_chart(sales_over_time: pd.DataFrame) -> alt.Chart:
                 "July","August","September","October","November","December"
             ]
         ),
-        y=alt.Y("order_id", title="Sales"),
-        color=alt.Color(
-            "order_purchase_year:O",
-            title="Year",
-            scale=alt.Scale(domain=[2017, 2018], range=['darkgreen', 'orange'])
-        )
+        y=alt.Y("price", title="Sales")
     ).properties(
-        title='2017–2018 Sales by Month',
+        title='2017–2018 Sales by Month and Product Category',
         width=1250,
-        height=500
+        height=500,
     )
 
-    return seventeen_eighteen_chart
+    return chart
 
 def delivery_nulls_by_date_chart(df_order: pd.DataFrame) -> alt.Chart:
     """
@@ -240,15 +240,46 @@ def revenue_ARPU_by_region_and_product_category_chart(sales_by_region: pd.DataFr
         width=800,
         height=500
     ).interactive()
+    rule = alt.Chart(sales_by_region).mark_rule(color='red', strokeWidth=2).encode(
+        y=alt.Y('mean(ARPU):Q', title='Average Revenue per Order (ARPU)')
+    )
+    rule2 = alt.Chart(sales_by_region).mark_rule(color='blue', strokeWidth=2).encode(
+        x=alt.X('mean(Sales):Q', title='Total Sales (BRL)')
+    )
 
-    return bubble_chart
+    return bubble_chart + rule + rule2
 
 def product_delivery_time_chart(order_item_product: pd.DataFrame) -> alt.Chart:
-    numeric_cols = ['product_weight_g', 'price','freight_value', 'delivery_time', 'product_volume']
-    for_analysis = order_item_product[numeric_cols].corr()
 
     fig, ax = plt.subplots(figsize=(10, 10))
-    ax = sns.heatmap(for_analysis[numeric_cols].corr(), annot=True, cmap='coolwarm', ax=ax)
+    ax = sns.heatmap(order_item_product, annot=True, cmap='coolwarm', ax=ax)
     ax.set_title('Correlation Heatmap of Product Dimensions and Delivery Time')
+
+    return fig
+
+def order_approved_at_nulls_chart(df_order: pd.DataFrame) -> plt.Figure:
+    
+    fig, ax = plt.subplots(1,2, figsize=(10,5))
+
+    df_order_approved_nulls = df_order.loc[df_order['order_approved_at'].isna()]
+
+    # Plot order status for orders with null values in 'order_approved_at'
+    idx = df_order_approved_nulls.loc[:,"order_status"].value_counts().index
+    data = df_order_approved_nulls.loc[:,"order_status"].value_counts().values
+
+    ax[0].bar(idx, data)
+    ax[0].set_xticklabels(idx, rotation=45, ha='right')
+    ax[0].set_ylabel('Count')
+    ax[0].set_title('Order Status for Orders with Null Delivery Dates')
+
+    # Plot order status for all orders
+    idx = df_order.loc[:,"order_status"].value_counts().index
+    data = df_order.loc[:,"order_status"].value_counts().values
+
+    ax[1].bar(idx, data)
+    ax[1].set_xticklabels(idx, rotation=45, ha='right')
+    ax[1].set_ylabel('Count')
+    ax[1].set_title('Order Status for All Orders')
+    ax[1].set_yscale('log')
 
     return fig
