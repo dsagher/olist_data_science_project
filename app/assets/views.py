@@ -6,6 +6,11 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG)
 
+"""-------------------------Merge Views--------------------------"""
+
+def get_orders_merged():
+    pass
+
 def get_sales_by_region(df_customer: pd.DataFrame, df_orders: pd.DataFrame, df_geo: pd.DataFrame, df_order_item: pd.DataFrame, df_product: pd.DataFrame) -> pd.DataFrame:
     df_customer = df_customer.copy()
     df_orders = df_orders.copy()
@@ -118,8 +123,10 @@ def get_delivery_nulls(df_order: pd.DataFrame) -> (pd.DataFrame, pd.DataFrame):
 
         return carrier_all, customer_all
 
-def get_total_revenue(df: pd.DataFrame) -> str:
-    return f"${df['payment_value'].sum():,.0f}"
+
+"""--------------------------KPI Views--------------------------"""
+def get_total_revenue(df_order_item: pd.DataFrame) -> str:
+    return f"${df_order_item['price'].sum().astype(int):,.0f}"
 
 def get_total_orders(df: pd.DataFrame) -> str:
     return f"{df['order_id'].nunique():,.0f}"
@@ -129,6 +136,22 @@ def get_total_customers(df: pd.DataFrame) -> str:
 
 def get_total_products(df: pd.DataFrame) -> str:
     return f"{df['product_id'].nunique():,.0f}"
+
+def get_highest_selling_city(df_order: pd.DataFrame, df_order_item: pd.DataFrame, df_customer: pd.DataFrame, df_geo: pd.DataFrame) -> str:
+    df_order = df_order.copy()
+    df_order_item = df_order_item.copy()
+    df_customer = df_customer.copy()
+    df_geo = df_geo.copy()
+
+    highest_selling_city = (df_order
+        .merge(df_order_item, on='order_id', how='left')
+        .merge(df_customer, on='customer_id', how='left')
+        .merge(df_geo, left_on='customer_zip_code_prefix', right_on='geolocation_zip_code_prefix', how='left')
+        .groupby('geolocation_city')
+        .agg({'order_id': 'count'})
+        .sort_values(by='order_id', ascending=False).head(1)).index[0]
+
+    return highest_selling_city
 
 def get_revenue_ARPU_by_region(df_customer: pd.DataFrame, df_order: pd.DataFrame, df_geo: pd.DataFrame, df_order_item: pd.DataFrame, df_product: pd.DataFrame) -> pd.DataFrame:
 
@@ -175,3 +198,57 @@ def get_product_delivery_time(df_order_item: pd.DataFrame, df_product: pd.DataFr
     for_analysis = for_analysis.merge(df_order, on='order_id', how='inner')
     for_analysis['product_volume'] = for_analysis['product_length_cm'] * for_analysis['product_height_cm'] * for_analysis['product_width_cm']
     return for_analysis
+
+def get_highest_selling_category(df_order_item: pd.DataFrame, df_product: pd.DataFrame) -> str:
+    df_order_item = df_order_item.copy()
+    df_product = df_product.copy()
+    highest_selling_category = (df_order_item
+        .merge(df_product[['product_id', 'product_category_name']], on='product_id', how='inner')
+        .groupby('product_category_name')
+        .agg({'price': 'sum'})
+        .sort_values(by='price', ascending=False).head(1)).index[0]
+    return highest_selling_category
+
+def get_above_average_sales_and_below_average_arpu(sales_by_region: pd.DataFrame, df_order: pd.DataFrame, df_order_item: pd.DataFrame, df_product: pd.DataFrame) -> pd.DataFrame:
+    # Means
+    avg_ARPU = sales_by_region["ARPU"].mean()
+    avg_sales = sales_by_region['Sales'].mean()
+
+    # Above average sales, below average ARPU
+    mask = (sales_by_region['Sales'] > avg_sales) & (sales_by_region['ARPU'] < avg_ARPU)
+
+    # Top 10
+    above_avg = sales_by_region.loc[mask].sort_values(by=['Sales']).head(10)
+
+    # Merge order, order_item, product, and above average to grab top sales
+    merge = (df_order
+            .merge(df_order_item)
+            .merge(df_product)
+            .merge(above_avg, left_on="product_category_name", right_on="Product Category")
+            [['ARPU','geolocation_region','price', "product_category_name", "order_purchase_month"]])
+
+    merge['order_purchase_month'] = pd.to_datetime(merge['order_purchase_month'])
+    return merge
+
+def get_below_average_sales_and_above_average_arpu(sales_by_region: pd.DataFrame, df_order: pd.DataFrame, df_order_item: pd.DataFrame, df_product: pd.DataFrame) -> pd.DataFrame:
+    # Means
+    avg_ARPU = sales_by_region["ARPU"].mean()
+    avg_sales = sales_by_region['Sales'].mean()
+
+    # Above average sales, below average ARPU
+    mask = (sales_by_region['Sales'] < avg_sales) & (sales_by_region['ARPU'] > avg_ARPU)
+
+    # Top 10
+    below_avg = sales_by_region.loc[mask].sort_values(by=['Sales']).head(10)
+
+    # Merge order, order_item, product, and above average to grab top sales
+    merge = (df_order
+            .merge(df_order_item)
+            .merge(df_product)
+            .merge(below_avg, left_on="product_category_name", right_on="Product Category")
+            [['ARPU','geolocation_region','price', "product_category_name", "order_purchase_month"]])
+
+    merge['order_purchase_month'] = pd.to_datetime(merge['order_purchase_month'])
+    return merge
+
+"""--------------------------Aggregate Views--------------------------"""
