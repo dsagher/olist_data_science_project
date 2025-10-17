@@ -4,7 +4,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 
-def get_sales_by_region_category_bubble_chart(df: pd.DataFrame) -> alt.Chart:
+def get_sales_by_region_category_bubble_chart(df: pd.DataFrame) -> alt.LayerChart:
     """
     Get the bubble chart for ARPU and total sales by Region and Product Category
     Args:

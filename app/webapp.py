@@ -29,7 +29,7 @@ total_revenue = aggregations.get_total_revenue(data)
 total_orders = aggregations.get_total_orders(data)
 total_customers = aggregations.get_total_customers(data)
 highest_selling_city = merges.get_highest_selling_cities(data).head(1).index[0].title()
-highest_selling_category = merges.get_highest_selling_categories(data).title().replace("_", " & ")
+highest_selling_category = merges.get_highest_selling_categories(data).head(1).index[0].title().replace("_", " & ")
 
 VALID_YEARS = [2016, 2017, 2018, 2019]
 

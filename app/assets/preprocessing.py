@@ -66,34 +66,6 @@ def map_states_to_regions(data: dict) -> dict:
 
     return data
 
-
-def load_raw_data()-> dict:
-    return {
-        'geo': pd.read_csv(DATA_RAW_DIR / 'olist_geolocation_dataset.csv'),
-        'order': pd.read_csv(DATA_RAW_DIR / 'olist_orders_dataset.csv'),
-        'order_item': pd.read_csv(DATA_RAW_DIR / 'olist_order_items_dataset.csv'),
-        'order_payment': pd.read_csv(DATA_RAW_DIR / 'olist_order_payments_dataset.csv'),
-        'order_review': pd.read_csv(DATA_RAW_DIR / 'olist_order_reviews_dataset.csv'),
-        'product': pd.read_csv(DATA_RAW_DIR / 'olist_products_dataset.csv'),
-        'seller': pd.read_csv(DATA_RAW_DIR / 'olist_sellers_dataset.csv'),
-        'customer': pd.read_csv(DATA_RAW_DIR / 'olist_customers_dataset.csv'),
-        'product_category': pd.read_csv(DATA_RAW_DIR / 'product_category_name_translation.csv')
-        }
-
-
-def load_processed_data() -> dict:
-    return {
-        'geo': pd.read_csv(DATA_PROCESSED_DIR / 'geo.csv'),
-        'order': pd.read_csv(DATA_PROCESSED_DIR / 'order.csv', parse_dates=['purchase_timestamp', 'approved_timestamp', 'delivered_carrier_date', 'delivered_customer_date', 'purchase_month']),
-        'order_item': pd.read_csv(DATA_PROCESSED_DIR / 'order_item.csv'),
-        'order_payment': pd.read_csv(DATA_PROCESSED_DIR / 'order_payment.csv'),
-        'order_review': pd.read_csv(DATA_PROCESSED_DIR / 'order_review.csv'),
-        'product': pd.read_csv(DATA_PROCESSED_DIR / 'product.csv'),
-        'seller': pd.read_csv(DATA_PROCESSED_DIR / 'seller.csv'),
-        'customer': pd.read_csv(DATA_PROCESSED_DIR / 'customer.csv'),
-        'product_category': pd.read_csv(DATA_PROCESSED_DIR / 'product_category.csv')
-    }
-
 @cache_data
 def load_processed_data_streamlit() -> dict:
     return load_processed_data()
@@ -164,32 +136,6 @@ def add_date_features(data: dict) -> dict:
     data['order']['purchase_weekday'] = data['order']['purchase_timestamp'].dt.weekday
     return data
 
-def impute_delivery_dates(data: dict) -> dict:
-    """
-    Impute the delivery dates
-    """
-    data['order'] = data['order']
-    customer_missing_mask = data['order']['delivered_customer_date'].isna()
-    carrier_missing_mask = data['order']['delivered_carrier_date'].isna()
-
-    #! Move to add Date Features
-    data['order']['delivery_time'] = data['order']['delivered_customer_date'] - data['order']['purchase_timestamp']  
-    data['order']['delivery_time'] = data['order']['delivery_time'].dt.days
-
-    # Calculate mean and std of delivery time
-    mask = data['order']['delivery_time'].isna()
-
-    # Impute missing delivery times 
-    delivery_mean = data['order']['delivery_time'].mean()
-    delivery_std = data['order']['delivery_time'].std()
-    data['order'].loc[mask, 'delivery_time'] = lognorm.rvs(s=delivery_std, scale=np.exp(delivery_mean))
-
-    # Impute customer and carrier date with purchase date plus average delivery time
-    data['order'].loc[customer_missing_mask, 'order_delivered_customer_date'] = data['order'].loc[customer_missing_mask, 'purchase_timestamp']+ dt.timedelta(days=delivery_mean)
-    data['order'].loc[carrier_missing_mask, 'order_delivered_carrier_date'] = data['order'].loc[carrier_missing_mask, 'purchase_timestamp']+ dt.timedelta(days=delivery_mean)
-    
-    return data
-
 def merge_product_category(data: dict) -> dict:
     """
     Merge the product category data
@@ -241,16 +187,51 @@ def add_customer_spending(data: dict) -> dict:
     data['customer'] = pd.merge(data['customer'], customer_spending, on='customer_id', how='inner')
     return data
 
+def impute_order_delivery(data:dict) -> dict:
+
+    df_order = data['order']
+    df_order_item = data['order_item']
+    df_seller = data['seller']
+
+    mask = df_order['order_status'].isin(['unavailable', 'delivered'])
+    df_order['delivered_customer_date'] = pd.to_datetime(df_order['delivered_customer_date'])
+    df_order['delivered_carrier_date'] = pd.to_datetime(df_order['delivered_carrier_date'])
+
+    filled = (
+        df_order[mask]
+        .merge(df_order_item, how='left')
+        .merge(df_seller, how='left')
+        # Impute median zip codes grouped by zip codes
+        .groupby('zip_code_prefix')
+        .apply(
+            lambda g: g.assign(
+            # Fill customer delivery date with values from records with order_status as delivered
+                order_delivered_customer_date=g['delivered_customer_date'].fillna(
+                    g.loc[g['order_status'] == 'delivered', 'delivered_customer_date'].median()
+                ),
+            # Fill carrier delivery date with values from records with order_status as delivered
+                order_delivered_carrier_date=g['delivered_carrier_date'].fillna(
+                    g.loc[g['order_status'] == 'delivered', 'delivered_carrier_date'].median()
+                )
+            )
+        )
+        .reset_index(drop=True)
+    )
+    data['order'] = filled[data['order'].columns]
+
+    return data
+"""----------------------------I/O----------------------------"""
+
 def preprocess_data() -> dict:
     data = load_raw_data()
     data = rename_columns(data)
     data = convert_to_datetime(data)
     data = add_date_features(data)
-    data = impute_delivery_dates(data)
     data = map_states_to_regions(data)
     data = merge_product_category(data)
     data = add_product_volume(data)
     data = add_customer_spending(data)
+    data = impute_order_delivery(data)
     return data
 
 def save_processed_data() -> None:
@@ -264,6 +245,32 @@ def save_processed_data() -> None:
     print("All data saved to data/processed/")
     print("Done")
     return
+
+def load_raw_data()-> dict:
+    return {
+        'geo': pd.read_csv(DATA_RAW_DIR / 'olist_geolocation_dataset.csv'),
+        'order': pd.read_csv(DATA_RAW_DIR / 'olist_orders_dataset.csv'),
+        'order_item': pd.read_csv(DATA_RAW_DIR / 'olist_order_items_dataset.csv'),
+        'order_payment': pd.read_csv(DATA_RAW_DIR / 'olist_order_payments_dataset.csv'),
+        'order_review': pd.read_csv(DATA_RAW_DIR / 'olist_order_reviews_dataset.csv'),
+        'product': pd.read_csv(DATA_RAW_DIR / 'olist_products_dataset.csv'),
+        'seller': pd.read_csv(DATA_RAW_DIR / 'olist_sellers_dataset.csv'),
+        'customer': pd.read_csv(DATA_RAW_DIR / 'olist_customers_dataset.csv'),
+        'product_category': pd.read_csv(DATA_RAW_DIR / 'product_category_name_translation.csv')
+        }
+
+def load_processed_data() -> dict:
+    return {
+        'geo': pd.read_csv(DATA_PROCESSED_DIR / 'geo.csv'),
+        'order': pd.read_csv(DATA_PROCESSED_DIR / 'order.csv', parse_dates=['purchase_timestamp', 'approved_timestamp', 'delivered_carrier_date', 'delivered_customer_date', 'purchase_month']),
+        'order_item': pd.read_csv(DATA_PROCESSED_DIR / 'order_item.csv'),
+        'order_payment': pd.read_csv(DATA_PROCESSED_DIR / 'order_payment.csv'),
+        'order_review': pd.read_csv(DATA_PROCESSED_DIR / 'order_review.csv'),
+        'product': pd.read_csv(DATA_PROCESSED_DIR / 'product.csv'),
+        'seller': pd.read_csv(DATA_PROCESSED_DIR / 'seller.csv'),
+        'customer': pd.read_csv(DATA_PROCESSED_DIR / 'customer.csv'),
+        'product_category': pd.read_csv(DATA_PROCESSED_DIR / 'product_category.csv')
+    }
 
 if __name__ == "__main__":
     save_processed_data()

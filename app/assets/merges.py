@@ -103,7 +103,7 @@ def get_average_sales_ARPU(sales_by_region: pd.DataFrame,
     merge['purchase_month'] = pd.to_datetime(merge['purchase_month'])
     return merge
 
-def get_highest_selling_cities(data: dict[str, pd.DataFrame]) -> str:
+def get_highest_selling_cities(data: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
     Get the highest selling cities
     Args:
@@ -128,7 +128,7 @@ def get_highest_selling_cities(data: dict[str, pd.DataFrame]) -> str:
     return highest_selling_cities
 
 
-def get_highest_selling_categories(data: dict[str, pd.DataFrame]) -> str:
+def get_highest_selling_categories(data: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
     Get the highest selling categories
     Args:
@@ -141,9 +141,9 @@ def get_highest_selling_categories(data: dict[str, pd.DataFrame]) -> str:
     df_order_item = data['order_item']
     df_product = data['product']
 
-    highest_selling_category = (df_order_item
+    highest_selling_categories = (df_order_item
         .merge(df_product['product_id'], on='product_id', how='inner')
         .groupby('category_name')
         .agg({'price': 'sum'})
-        .sort_values(by='price', ascending=False).head(1)).index[0]
-    return highest_selling_category
+        .sort_values(by='price', ascending=False))
+    return highest_selling_categories
