@@ -1,58 +1,86 @@
-# Olist Sales Analysis Dashboard
+# Olist E-Commerce Data Analysis Dashboard
+*Project for CMSE 830 - Fall 2025*
 
-Welcome to the Olist Sales Analysis Dashboard! This project uses the [Olist E-commerce Public Dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce), a comprehensive dataset containing information about orders, products, sellers, customers, and geolocations from one of Brazil's largest marketplaces.
+An interactive Streamlit dashboard for exploring and analyzing Brazilian e-commerce data from Olist. This project provides comprehensive exploratory data analysis (EDA) with visualizations for sales patterns, customer behavior, and regional insights.
 
----
+### Application Files
 
-## Why We Chose This Dataset
+- **`app/webapp.py`**: Main Streamlit dashboard that displays KPIs (total revenue, orders, customers, top-selling city/category) and interactive visualizations including bubble charts and time-series analysis of sales and ARPU (Average Revenue Per User).
 
-We chose the Olist E-commerce dataset because:
-- **Richness & Scope**: It offers granular transaction-level data, customer demographics, locations, product categories, payments, and reviews.
-- **Real-world Complexity**: The multi-table relational structure provides rich opportunities for analysis and ETL challenges that are typical in business and data science roles.
-- **Business Relevance**: Understanding e-commerce dynamics (sales, regional performance, ARPU, product categories) is valuable for business insight and analytics.
+- **`app/assets/preprocessing.py`**: Handles all data preprocessing including:
+  - Loading raw and processed data
+  - Column renaming and standardization
+  - DateTime conversions
+  - Feature engineering (delivery time, date features, product volume)
+  - Region mapping for Brazilian states
+  - Customer spending categorization
 
----
+- **`app/assets/merges.py`**: Provides data merging functions:
+  - `get_sales_by_region_category()`: Merges customer, order, and product data by region
+  - `get_average_sales_ARPU()`: Filters data by sales and ARPU thresholds
+  - `get_highest_selling_cities()`: Identifies top-performing cities
+  - `get_highest_selling_categories()`: Identifies best-selling product categories
 
-## What We Learned from IDA/EDA
+- **`app/assets/aggregations.py`**: Calculates key metrics:
+  - ARPU (Average Revenue Per User) calculation
+  - Total revenue, orders, and customer counts
+  - Formatted string outputs for dashboard KPIs
 
-Through our initial and exploratory data analysis:
-- **Regional Trends**: Most orders are concentrated in the Southeast and South regions; the North has the fewest customers and orders.
-- **Sales Seasonality**: There are clear sales peaks at certain times, e.g., end-of-year increases.
-- **Top Categories**: A small number of product categories drive a large share of revenues.
-- **Delivery Issues**: Some orders lack delivery timestamps due to cancellations or system issues.
-- **Customer Distribution**: Customers are primarily urban but spread across many Brazilian states and cities.
+- **`app/assets/charts.py`**: Generates Altair visualizations:
+  - Bubble charts for sales vs ARPU by region and category
+  - Time-series line charts for order trends
+  - Interactive tooltips and filtering
 
----
+### Data Files
 
-## Preprocessing Steps Completed
+- **`data/raw/`**: Contains original Olist datasets downloaded from the source, including customer, order, product, seller, payment, review, and geolocation data.
 
-To prepare the data for dashboarding and analysis, we:
-- **Datetime Conversion & Imputation**: Converted date columns to datetime types and imputed missing delivery times using mean-based approaches.
-- **Region Mapping**: Mapped customer and geo states to five macro-regions of Brazil for clearer aggregation.
-- **Data Merging**: Merged customer, order, product, and geolocation tables to connect spatial, product, and transaction data.
-- **Top Categories Extraction**: Identified the top 10 product categories by sales for focused analysis.
-- **Cleaned Dataframes**: Loaded, selected, and grouped relevant columns to reduce redundancy and speed up analysis.
+- **`data/processed/`**: Contains cleaned and feature-engineered datasets ready for analysis and visualization.
 
----
+### Notebooks
 
-## What We Have Tried with Streamlit
+- **`notebooks/cleaning.ipynb`**: Documents the data cleaning process and quality checks
+- **`notebooks/correlation_analysis.ipynb`**: Statistical analysis and correlation studies
+- **`notebooks/EDA.ipynb`**: Exploratory data analysis and initial insights
+- **`notebooks/feature_engineering.ipynb`**: Feature creation and transformation experiments
 
-So far, we have:
-- **Developed an Interactive Dashboard**: Showing sales by region, product categories, and trends over time using Altair charts.
-- **Implemented Comparative Visualizations**: 
-    - Bubble charts display sales, ARPU, and order counts by region and product.
-    - Bar and pie charts highlight top product categories and their sales/percentage shares.
-- **Handled Data Loading & Processing**: The Streamlit app loads raw data, performs all processing steps on the fly, and serves interactive visualizations.
-- **Enabled Filtered Analysis**: Separated charts for selected years/months to analyze trends.
+## Getting Started
 
----
+### Installation
 
-## How to Run
+```bash
+pip install -r requirements.txt
+```
 
-1. Clone this repository.
-2. Install requirements (`pip install -r requirements.txt`).
-3. Ensure the raw Olist data is present in `./data/raw/` as provided on Kaggle.
-4. Run `streamlit run app/streamlit.py`.
-5. Explore the dashboard in your browser!
+### Running the Dashboard
+
+```bash
+streamlit run app/webapp.py
+```
+
+### Processing Raw Data
+
+To regenerate processed datasets from raw data:
+
+```bash
+python app/assets/preprocessing.py
+```
+
+
+## Features
+
+- **KPI Dashboard**: View key business metrics at a glance
+- **Regional Analysis**: Explore sales patterns across Brazilian regions
+- **ARPU Insights**: Identify high-value and low-value customer segments
+- **Time-Series Analysis**: Track order trends over time
+- **Interactive Visualizations**: Filter and explore data dynamically
+
+## Technologies Used
+
+- **Streamlit**: Interactive web dashboard
+- **Pandas**: Data manipulation and analysis
+- **Altair**: Declarative statistical visualizations
+- **Scikit-learn**: Feature engineering (KBinsDiscretizer)
+- **SciPy**: Statistical computations
 
 ---
