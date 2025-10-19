@@ -95,7 +95,7 @@ def rename_columns(data: dict) -> dict:
     data['product'] = data['product'].rename(columns={" product_category_name": "category_name",
                                              "product_photos_qty": "photos_qty",
                                              "product_name_lenght": "name_length",
-                                             "product_description_length": "description_length",
+                                             "product_description_lenght": "description_length",
                                              "product_weight_g": "weight",
                                              "product_length_cm": "length",
                                              "product_height_cm": "height",
@@ -104,7 +104,8 @@ def rename_columns(data: dict) -> dict:
                                         "order_purchase_timestamp": "purchase_timestamp",
                                         "order_approved_at": "approved_timestamp",
                                         "order_delivered_customer_date": "delivered_customer_date",
-                                        "order_delivered_carrier_date": "delivered_carrier_date"})
+                                        "order_delivered_carrier_date": "delivered_carrier_date",
+                                        "order_estimated_delivery_date": "estimated_delivery_date"})
     data['seller'] = data['seller'].rename(columns={"seller_zip_code_prefix": "zip_code_prefix", 
                                             "seller_city": "city", 
                                             "seller_state": "state"})
@@ -119,6 +120,18 @@ def convert_to_datetime(data: dict) -> dict:
     data['order']['approved_timestamp'] = pd.to_datetime(data['order']['approved_timestamp'])
     data['order']['delivered_customer_date'] = pd.to_datetime(data['order']['delivered_customer_date'])
     data['order']['delivered_carrier_date'] = pd.to_datetime(data['order']['delivered_carrier_date'])
+    return data
+
+def add_delivery_time(data: dict) -> dict:
+    """
+    
+    """
+    df_order = data['order']
+
+    delivery_time = (df_order['delivered_carrier_date'] - df_order['purchase_timestamp']).dt.days
+
+    data['order']['delivery_time'] = delivery_time
+
     return data
 
 def add_date_features(data: dict) -> dict:
@@ -161,7 +174,7 @@ def add_product_volume(data: dict) -> dict:
     data['order_item'] = data['order_item']
     data['product'] = data['product']
     data['order_item'] = data['order_item'].merge(data['product'], on='product_id', how='inner')
-    data['order_item']['product_volume'] = data['order_item']['length'] * data['order_item']['height'] * data['order_item']['width']
+    data['order_item']['volume'] = data['order_item']['length'] * data['order_item']['height'] * data['order_item']['width']
     return data
 
 def add_customer_spending(data: dict) -> dict:
@@ -223,15 +236,27 @@ def impute_order_delivery(data:dict) -> dict:
 """----------------------------I/O----------------------------"""
 
 def preprocess_data() -> dict:
+
     data = load_raw_data()
+
     data = rename_columns(data)
+
     data = convert_to_datetime(data)
+
     data = add_date_features(data)
+
+    data = add_delivery_time(data) 
+
     data = map_states_to_regions(data)
+
     data = merge_product_category(data)
+
     data = add_product_volume(data)
+
     data = add_customer_spending(data)
+
     data = impute_order_delivery(data)
+
     return data
 
 def save_processed_data() -> None:

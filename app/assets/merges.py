@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 def get_sales_by_region_category(data: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
     Merge the customer, orders, geo, order item, to get sales by region
@@ -47,7 +46,6 @@ def get_sales_by_region_category(data: dict[str, pd.DataFrame]) -> pd.DataFrame:
             )
     
     return sales_by_region
-
 
 def get_average_sales_ARPU(sales_by_region: pd.DataFrame, 
                                                     data: dict[str, pd.DataFrame],
@@ -126,7 +124,6 @@ def get_highest_selling_cities(data: dict[str, pd.DataFrame]) -> pd.DataFrame:
                     .sort_values(by='order_id', ascending=False))
     
     return highest_selling_cities
-
 
 def get_highest_selling_categories(data: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
